@@ -18,7 +18,8 @@ import { StatsCards } from "@/components/stats-cards";
 import { AddAssignment } from "@/components/add-assignment";
 import { SemesterManager } from "@/components/semester-manager";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraduationCap, CalendarDays, List, BarChart3 } from "lucide-react";
+import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "academic-dashboard-items";
 const SEMESTERS_STORAGE_KEY = "academic-dashboard-semesters";
@@ -315,14 +316,17 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <AddAssignment
-                onAddItem={handleAddItem}
-                onAddItems={handleAddItems}
-                classes={currentClasses}
-              />
+              <div className="hidden md:inline-flex">
+                <AddAssignment
+                  onAddItem={handleAddItem}
+                  onAddItems={handleAddItems}
+                  classes={currentClasses}
+                />
+              </div>
               <Tabs
                 value={view}
                 onValueChange={(v) => setView(v as "list" | "calendar" | "grades")}
+                className="hidden md:block"
               >
                 <TabsList className="bg-secondary">
                   <TabsTrigger
@@ -353,7 +357,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6">
         <StatsCards items={currentItems} />
 
         <div className="rounded-xl border border-border bg-card p-4 md:p-6">
@@ -379,6 +383,70 @@ export function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* Mobile bottom navigation */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Main navigation"
+      >
+        <div className="grid grid-cols-3 min-h-16">
+          <button
+            type="button"
+            onClick={() => setView("list")}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              view === "list"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-current={view === "list" ? "page" : undefined}
+            aria-label="Checklist"
+          >
+            <ClipboardList className="h-5 w-5" />
+            <span>Checklist</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("grades")}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              view === "grades"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-current={view === "grades" ? "page" : undefined}
+            aria-label="Grade Calculator"
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span>Grades</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("calendar")}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              view === "calendar"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-current={view === "calendar" ? "page" : undefined}
+            aria-label="Calendar"
+          >
+            <CalendarDays className="h-5 w-5" />
+            <span>Calendar</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile FAB - positioned above bottom nav */}
+      <div className="fixed bottom-20 right-6 z-50 md:hidden">
+        <AddAssignment
+          onAddItem={handleAddItem}
+          onAddItems={handleAddItems}
+          classes={currentClasses}
+          variant="fab"
+        />
+      </div>
     </div>
   );
 }

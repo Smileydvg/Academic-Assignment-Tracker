@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -41,7 +42,6 @@ import {
   ClipboardCheck,
   GraduationCap,
   FolderKanban,
-  MoreHorizontal,
   PenLine,
   Search,
   AlertTriangle,
@@ -351,7 +351,158 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
       </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile: Card layout */}
+        <div className="block md:hidden space-y-3 p-3">
+          {filteredItems.map((item) => {
+            const daysUntil = getDaysUntil(item.dueDate);
+            const TypeIcon = typeIcons[item.type];
+            const statusInfo = statusConfig[item.status];
+            const StatusIcon = statusInfo.icon;
+
+            return (
+              <Card
+                key={item.id}
+                className={cn(
+                  "overflow-hidden transition-colors hover:bg-secondary/30",
+                  item.status === "completed" && "opacity-60"
+                )}
+              >
+                <CardContent className="p-4 gap-3 flex flex-col">
+                  {/* Title row with type */}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={cn(
+                        "w-1 min-h-10 rounded-full shrink-0",
+                        getClassColor(item.classCode, classList)
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={cn(
+                          "font-medium",
+                          item.status === "completed" && "line-through"
+                        )}
+                      >
+                        {item.title}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                        <TypeIcon className="h-4 w-4 shrink-0" />
+                        <span className="capitalize">{item.type}</span>
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stacked: Class, Date, Status */}
+                  <div className="flex flex-col gap-2 pl-4 border-l-2 border-border/50">
+                    <div>
+                      <span className="text-xs text-muted-foreground">Class</span>
+                      <div className="mt-0.5">
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {item.classCode}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Due Date</span>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-sm">{formatDate(item.dueDate)}</span>
+                        {item.time && (
+                          <span className="text-sm text-muted-foreground">{item.time}</span>
+                        )}
+                        {item.status !== "completed" && (
+                          <Badge
+                            variant={
+                              daysUntil < 0
+                                ? "destructive"
+                                : daysUntil <= 3
+                                  ? "default"
+                                  : "secondary"
+                            }
+                            className={cn(
+                              "text-xs",
+                              daysUntil <= 3 &&
+                                daysUntil >= 0 &&
+                                "bg-warning text-warning-foreground"
+                            )}
+                          >
+                            {daysUntil < 0
+                              ? "Overdue"
+                              : daysUntil === 0
+                                ? "Today"
+                                : daysUntil === 1
+                                  ? "Tomorrow"
+                                  : `${daysUntil}d`}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Status</span>
+                      <div className="mt-0.5">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "h-auto py-1 px-2 gap-1.5 -ml-2",
+                                statusInfo.className
+                              )}
+                            >
+                              <StatusIcon className="h-4 w-4" />
+                              <span className="text-sm">{statusInfo.label}</span>
+                              <ChevronDown className="h-3 w-3 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            {(
+                              Object.entries(statusConfig) as [
+                                ItemStatus,
+                                (typeof statusConfig)[ItemStatus],
+                              ][]
+                            ).map(([status, config]) => {
+                              const Icon = config.icon;
+                              return (
+                                <DropdownMenuItem
+                                  key={status}
+                                  onClick={() => onStatusChange(item.id, status)}
+                                  className={cn("gap-2", config.className)}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                  {config.label}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    {item.gradeCategory && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Grade</span>
+                        <div className="mt-0.5">
+                          <GradeDialog
+                            item={item}
+                            onGradeChange={onGradeChange}
+                            classList={classList}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Desktop: Table layout */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-secondary/50 text-left text-sm text-muted-foreground">
@@ -499,6 +650,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
             </tbody>
           </table>
         </div>
+
         {filteredItems.length === 0 && (
           <div className="py-12 text-center text-muted-foreground">
             No items match your filters

@@ -1,8 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from 'lucide-react';
-
 import { useState } from "react";
 import {
   Dialog,
@@ -47,6 +45,8 @@ interface AddAssignmentProps {
   onAddItem: (item: AcademicItem) => void;
   onAddItems: (items: AcademicItem[]) => void;
   classes?: ClassInfo[];
+  /** When true, renders as a compact FAB (icon only) for mobile */
+  variant?: "default" | "fab";
 }
 
 // Month name mapping for parsing
@@ -291,7 +291,7 @@ function parseTextToAssignments(text: string, classes: ClassInfo[]): ParsedItem[
   return parsed;
 }
 
-export function AddAssignment({ onAddItem, onAddItems, classes: classesProp }: AddAssignmentProps) {
+export function AddAssignment({ onAddItem, onAddItems, classes: classesProp, variant = "default" }: AddAssignmentProps) {
   const classes = classesProp || defaultClasses;
   const classList = classes; // Declare classList variable
   const [open, setOpen] = useState(false);
@@ -415,9 +415,17 @@ export function AddAssignment({ onAddItem, onAddItems, classes: classesProp }: A
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Assignment
+        <Button
+          className={
+            variant === "fab"
+              ? "rounded-full w-14 h-14 shadow-lg"
+              : "gap-2"
+          }
+          size={variant === "fab" ? "icon" : "default"}
+          aria-label={variant === "fab" ? "Add assignment" : undefined}
+        >
+          <Plus className={variant === "fab" ? "h-6 w-6" : "h-4 w-4"} />
+          {variant === "default" && "Add Assignment"}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
