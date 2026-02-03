@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   initialItems,
   initialSemesters,
@@ -17,8 +17,10 @@ import { GradeTracker } from "@/components/grade-tracker";
 import { StatsCards } from "@/components/stats-cards";
 import { AddAssignment } from "@/components/add-assignment";
 import { SemesterManager } from "@/components/semester-manager";
+import { ImportData } from "@/components/import-data";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList } from "lucide-react";
+import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "academic-dashboard-items";
@@ -26,21 +28,17 @@ const SEMESTERS_STORAGE_KEY = "academic-dashboard-semesters";
 const CURRENT_SEMESTER_KEY = "academic-dashboard-current-semester";
 
 function loadItemsFromStorage(): AcademicItem[] {
-  if (typeof window === "undefined") return initialItems;
+  if (typeof window === "undefined") return [];
 
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const parsedItems = JSON.parse(stored) as AcademicItem[];
-      // Merge with initial items to catch any new items added
-      const storedIds = new Set(parsedItems.map((i) => i.id));
-      const newItems = initialItems.filter((i) => !storedIds.has(i.id));
-      return [...parsedItems, ...newItems];
+      return JSON.parse(stored) as AcademicItem[];
     }
   } catch (error) {
     console.error("Failed to load from localStorage:", error);
   }
-  return initialItems;
+  return [];
 }
 
 function loadSemestersFromStorage(): Semester[] {
@@ -58,7 +56,7 @@ function loadSemestersFromStorage(): Semester[] {
 }
 
 function loadCurrentSemesterFromStorage(): string {
-  if (typeof window === "undefined") return "spring-2026";
+  if (typeof window === "undefined") return "my-semester";
 
   try {
     const stored = localStorage.getItem(CURRENT_SEMESTER_KEY);
@@ -68,7 +66,7 @@ function loadCurrentSemesterFromStorage(): string {
   } catch (error) {
     console.error("Failed to load current semester from localStorage:", error);
   }
-  return "spring-2026";
+  return "my-semester";
 }
 
 function saveItemsToStorage(items: AcademicItem[]) {
@@ -102,9 +100,9 @@ function saveCurrentSemesterToStorage(semesterId: string) {
 }
 
 export function Dashboard() {
-  const [items, setItems] = useState<AcademicItem[]>(initialItems);
+  const [items, setItems] = useState<AcademicItem[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>(initialSemesters);
-  const [currentSemesterId, setCurrentSemesterId] = useState("spring-2026");
+  const [currentSemesterId, setCurrentSemesterId] = useState("my-semester");
   const [view, setView] = useState<"list" | "calendar" | "grades">("list");
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -202,14 +200,17 @@ export function Dashboard() {
     setItems((prev) => [...prev, { ...item, semesterId: currentSemesterId }]);
   };
 
-  const handleUpdateItem = (
-    id: string,
-    updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>
-  ) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    );
-  };
+  const handleUpdateItem = useCallback(
+    (
+      id: string,
+      updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>
+    ) => {
+      setItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      );
+    },
+    []
+  );
 
   const handleAddItems = (newItems: AcademicItem[]) => {
     setItems((prev) => [
@@ -299,6 +300,39 @@ export function Dashboard() {
     );
   };
 
+  const handleImportData = (
+    newItems: AcademicItem[],
+    newClasses: ClassInfo[],
+    newSemester: Semester
+  ) => {
+    setItems(newItems);
+    setSemesters([newSemester]);
+    setCurrentSemesterId(newSemester.id);
+  };
+
+  const showImport = items.length === 0 && isLoaded;
+
+  if (showImport) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <GraduationCap className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Academic Dashboard</h1>
+                <p className="text-sm text-muted-foreground">Import your schedule to get started</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <ImportData onImport={handleImportData} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -325,6 +359,21 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  if (confirm("Replace all data with a new import? Current assignments will be cleared.")) {
+                    setItems([]);
+                    setSemesters(initialSemesters);
+                    setCurrentSemesterId("my-semester");
+                  }
+                }}
+              >
+                <Upload className="h-4 w-4" />
+                Import new
+              </Button>
               <div className="hidden md:inline-flex">
                 <AddAssignment
                   onAddItem={handleAddItem}

@@ -110,16 +110,8 @@ function parseTextToAssignments(text: string, classes: ClassInfo[]): ParsedItem[
     lecture: ["lecture", "class", "chapter", "ch.", "reading"],
   };
 
-  // Class detection with course code regex
-  const classCodeRegex = /\b(econ|eco|math|mis|bus|acc|fin|mkt|mgmt)\s*(\d{3})\b/gi;
-  
-  // Additional class keyword mapping
-  const classKeywords: Record<string, string[]> = {
-    ECON330: ["econ 330", "econ330", "eco 330", "eco330", "comparative", "economic systems"],
-    MATH120: ["math 120", "math120", "calculus", "business analysis", "business calc"],
-    MIS180: ["mis 180", "mis180", "information systems", "info systems"],
-    ECON321: ["econ 321", "econ321", "eco 321", "eco321", "microeconomic", "intermediate micro", "micro theory"],
-  };
+  // Class detection - match course codes like MATH101, CS 200, ECON330
+  const classCodeRegex = /\b([A-Za-z]{2,6})\s*(\d{2,4})\b/g;
 
   // Function to extract date from text
   function extractDate(text: string): string | null {
@@ -172,35 +164,14 @@ function parseTextToAssignments(text: string, classes: ClassInfo[]): ParsedItem[
 
   // Function to extract class code from text
   function extractClassCode(text: string): { code: string; name: string } | null {
-    const lowerText = text.toLowerCase();
-    
-    // Try regex pattern first (e.g., "ECON 330", "Math 120")
     const codeMatch = text.match(classCodeRegex);
     if (codeMatch) {
-      const match = codeMatch[0].toUpperCase().replace(/\s+/g, "");
-      const classInfo = classes.find((c) => c.code === match || c.code.replace(/\s+/g, "") === match);
+      const normalized = codeMatch[0].toUpperCase().replace(/\s+/g, "");
+      const classInfo = classes.find((c) => c.code.toUpperCase().replace(/\s+/g, "") === normalized);
       if (classInfo) {
         return { code: classInfo.code, name: classInfo.name };
       }
-      // Try matching just the pattern
-      const normalizedMatch = match.replace(/\s+/g, "");
-      for (const cls of classes) {
-        if (cls.code.replace(/\s+/g, "") === normalizedMatch) {
-          return { code: cls.code, name: cls.name };
-        }
-      }
     }
-
-    // Try keyword matching
-    for (const [code, keywords] of Object.entries(classKeywords)) {
-      if (keywords.some((kw) => lowerText.includes(kw))) {
-        const classInfo = classes.find((c) => c.code === code);
-        if (classInfo) {
-          return { code: classInfo.code, name: classInfo.name };
-        }
-      }
-    }
-
     return null;
   }
 

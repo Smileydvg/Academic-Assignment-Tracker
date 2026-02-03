@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import type { AcademicItem, ItemStatus, ClassInfo } from "@/lib/data";
 import { defaultClasses } from "@/lib/data";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,9 @@ function formatDateKey(year: number, month: number, day: number): string {
 
 export function CalendarView({ items, onStatusChange, onItemUpdate, classes: classesProp }: CalendarViewProps) {
   const classList = classesProp || defaultClasses;
+  const onItemUpdateRef = useRef(onItemUpdate);
+  onItemUpdateRef.current = onItemUpdate;
+
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -109,13 +112,17 @@ export function CalendarView({ items, onStatusChange, onItemUpdate, classes: cla
     );
   };
 
-  const handleDragEnd = (result: DropResult) => {
-    const { source, destination } = result;
-    if (!destination || !onItemUpdate || source.droppableId === destination.droppableId) return;
+  const handleDragEnd = useCallback((result: DropResult) => {
+    const { source, destination, reason } = result;
+    if (reason !== "DROP") return;
+    if (!destination || source.droppableId === destination.droppableId) return;
     const newDueDate = destination.droppableId;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(newDueDate)) return;
-    onItemUpdate(result.draggableId, { dueDate: newDueDate });
-  };
+    const update = onItemUpdateRef.current;
+    if (update) {
+      update(result.draggableId, { dueDate: newDueDate });
+    }
+  }, []);
 
   const isDragEnabled = !!onItemUpdate;
   const year = currentDate.getFullYear();
