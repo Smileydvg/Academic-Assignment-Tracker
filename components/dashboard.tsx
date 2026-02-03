@@ -202,6 +202,15 @@ export function Dashboard() {
     setItems((prev) => [...prev, { ...item, semesterId: currentSemesterId }]);
   };
 
+  const handleUpdateItem = (
+    id: string,
+    updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>
+  ) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    );
+  };
+
   const handleAddItems = (newItems: AcademicItem[]) => {
     setItems((prev) => [
       ...prev,
@@ -366,12 +375,14 @@ export function Dashboard() {
               items={currentItems}
               onStatusChange={handleStatusChange}
               onGradeChange={handleGradeChange}
+              onItemUpdate={handleUpdateItem}
               classes={currentClasses}
             />
           ) : view === "calendar" ? (
             <CalendarView
               items={currentItems}
               onStatusChange={handleStatusChange}
+              onItemUpdate={handleUpdateItem}
               classes={currentClasses}
             />
           ) : (

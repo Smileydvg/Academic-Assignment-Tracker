@@ -45,12 +45,16 @@ import {
   PenLine,
   Search,
   AlertTriangle,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 
 interface ItemTableProps {
   items: AcademicItem[];
   onStatusChange: (id: string, status: ItemStatus) => void;
   onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number) => void;
+  onItemUpdate?: (id: string, updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>) => void;
   classes?: ClassInfo[];
 }
 
@@ -243,13 +247,38 @@ function GradeDialog({
   );
 }
 
-export function ItemTable({ items, onStatusChange, onGradeChange, classes: classesProp }: ItemTableProps) {
+export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, classes: classesProp }: ItemTableProps) {
   const classList = classesProp || defaultClasses;
   const [filterClass, setFilterClass] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"dueDate" | "class" | "type">("dueDate");
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+
+  const startEditing = (item: AcademicItem) => {
+    setEditingId(item.id);
+    setEditTitle(item.title);
+    setEditDueDate(item.dueDate);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditTitle("");
+    setEditDueDate("");
+  };
+
+  const saveEditing = () => {
+    if (editingId && onItemUpdate && editTitle.trim() && editDueDate) {
+      onItemUpdate(editingId, {
+        title: editTitle.trim(),
+        dueDate: editDueDate,
+      });
+    }
+    cancelEditing();
+  };
 
   const filteredItems = items
     .filter((item) => {
@@ -358,6 +387,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
             const TypeIcon = typeIcons[item.type];
             const statusInfo = statusConfig[item.status];
             const StatusIcon = statusInfo.icon;
+            const isEditing = editingId === item.id;
 
             return (
               <Card
@@ -368,7 +398,6 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                 )}
               >
                 <CardContent className="p-4 gap-3 flex flex-col">
-                  {/* Title row with type */}
                   <div className="flex items-start gap-3">
                     <div
                       className={cn(
@@ -376,127 +405,185 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                         getClassColor(item.classCode, classList)
                       )}
                     />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={cn(
-                          "font-medium",
-                          item.status === "completed" && "line-through"
-                        )}
-                      >
-                        {item.title}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                        <TypeIcon className="h-4 w-4 shrink-0" />
-                        <span className="capitalize">{item.type}</span>
-                      </div>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Stacked: Class, Date, Status */}
+                                <div className="min-w-0 flex-1">
+                                  {isEditing ? (
+                                    <Input
+                                      value={editTitle}
+                                      onChange={(e) => setEditTitle(e.target.value)}
+                                      placeholder="Task name"
+                                      className="font-medium h-9"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <>
+                                      <p
+                                        className={cn(
+                                          "font-medium",
+                                          item.status === "completed" && "line-through"
+                                        )}
+                                      >
+                                        {item.title}
+                                      </p>
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                                        <TypeIcon className="h-4 w-4 shrink-0" />
+                                        <span className="capitalize">{item.type}</span>
+                                      </div>
+                                      {item.description && (
+                                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                          {item.description}
+                                        </p>
+                                      )}
+                                      {onItemUpdate && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 mt-2 -ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+                                          onClick={() => startEditing(item)}
+                                          aria-label="Edit assignment"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                          Edit
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                   <div className="flex flex-col gap-2 pl-4 border-l-2 border-border/50">
-                    <div>
-                      <span className="text-xs text-muted-foreground">Class</span>
-                      <div className="mt-0.5">
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {item.classCode}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Due Date</span>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-sm">{formatDate(item.dueDate)}</span>
-                        {item.time && (
-                          <span className="text-sm text-muted-foreground">{item.time}</span>
-                        )}
-                        {item.status !== "completed" && (
-                          <Badge
-                            variant={
-                              daysUntil < 0
-                                ? "destructive"
-                                : daysUntil <= 3
-                                  ? "default"
-                                  : "secondary"
-                            }
-                            className={cn(
-                              "text-xs",
-                              daysUntil <= 3 &&
-                                daysUntil >= 0 &&
-                                "bg-warning text-warning-foreground"
-                            )}
-                          >
-                            {daysUntil < 0
-                              ? "Overdue"
-                              : daysUntil === 0
-                                ? "Today"
-                                : daysUntil === 1
-                                  ? "Tomorrow"
-                                  : `${daysUntil}d`}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Status</span>
-                      <div className="mt-0.5">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={cn(
-                                "h-auto py-1 px-2 gap-1.5 -ml-2",
-                                statusInfo.className
-                              )}
-                            >
-                              <StatusIcon className="h-4 w-4" />
-                              <span className="text-sm">{statusInfo.label}</span>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                            {(
-                              Object.entries(statusConfig) as [
-                                ItemStatus,
-                                (typeof statusConfig)[ItemStatus],
-                              ][]
-                            ).map(([status, config]) => {
-                              const Icon = config.icon;
-                              return (
-                                <DropdownMenuItem
-                                  key={status}
-                                  onClick={() => onStatusChange(item.id, status)}
-                                  className={cn("gap-2", config.className)}
-                                >
-                                  <Icon className="h-4 w-4" />
-                                  {config.label}
-                                </DropdownMenuItem>
-                              );
-                            })}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    {item.gradeCategory && (
-                      <div>
-                        <span className="text-xs text-muted-foreground">Grade</span>
-                        <div className="mt-0.5">
-                          <GradeDialog
-                            item={item}
-                            onGradeChange={onGradeChange}
-                            classList={classList}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                                <div>
+                                  <span className="text-xs text-muted-foreground">Class</span>
+                                  <div className="mt-0.5">
+                                    <Badge variant="secondary" className="font-mono text-xs">
+                                      {item.classCode}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-muted-foreground">Due Date</span>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    {isEditing ? (
+                                      <Input
+                                        type="date"
+                                        value={editDueDate}
+                                        onChange={(e) => setEditDueDate(e.target.value)}
+                                        className="h-9 max-w-[160px]"
+                                      />
+                                    ) : (
+                                      <>
+                                        <span className="text-sm">{formatDate(item.dueDate)}</span>
+                                        {item.time && (
+                                          <span className="text-sm text-muted-foreground">{item.time}</span>
+                                        )}
+                                        {item.status !== "completed" && (
+                                          <Badge
+                                            variant={
+                                              daysUntil < 0
+                                                ? "destructive"
+                                                : daysUntil <= 3
+                                                  ? "default"
+                                                  : "secondary"
+                                            }
+                                            className={cn(
+                                              "text-xs",
+                                              daysUntil <= 3 &&
+                                                daysUntil >= 0 &&
+                                                "bg-warning text-warning-foreground"
+                                            )}
+                                          >
+                                            {daysUntil < 0
+                                              ? "Overdue"
+                                              : daysUntil === 0
+                                                ? "Today"
+                                                : daysUntil === 1
+                                                  ? "Tomorrow"
+                                                  : `${daysUntil}d`}
+                                          </Badge>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                {isEditing ? (
+                                  <div className="flex gap-2 pt-1">
+                                    <Button
+                                      size="sm"
+                                      className="gap-1.5"
+                                      onClick={saveEditing}
+                                      disabled={!editTitle.trim() || !editDueDate}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                      Save
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1.5"
+                                      onClick={cancelEditing}
+                                    >
+                                      <X className="h-4 w-4" />
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <span className="text-xs text-muted-foreground">Status</span>
+                                      <div className="mt-0.5">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className={cn(
+                                                "h-auto py-1 px-2 gap-1.5 -ml-2",
+                                                statusInfo.className
+                                              )}
+                                            >
+                                              <StatusIcon className="h-4 w-4" />
+                                              <span className="text-sm">{statusInfo.label}</span>
+                                              <ChevronDown className="h-3 w-3 opacity-50" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="start">
+                                            {(
+                                              Object.entries(statusConfig) as [
+                                                ItemStatus,
+                                                (typeof statusConfig)[ItemStatus],
+                                              ][]
+                                            ).map(([status, config]) => {
+                                              const Icon = config.icon;
+                                              return (
+                                                <DropdownMenuItem
+                                                  key={status}
+                                                  onClick={() => onStatusChange(item.id, status)}
+                                                  className={cn("gap-2", config.className)}
+                                                >
+                                                  <Icon className="h-4 w-4" />
+                                                  {config.label}
+                                                </DropdownMenuItem>
+                                              );
+                                            })}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                    {item.gradeCategory && (
+                                      <div>
+                                        <span className="text-xs text-muted-foreground">Grade</span>
+                                        <div className="mt-0.5">
+                                          <GradeDialog
+                                            item={item}
+                                            onGradeChange={onGradeChange}
+                                            classList={classList}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
             );
           })}
         </div>
@@ -513,6 +600,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                 <th className="px-4 py-3 font-medium">Grade</th>
                 <th className="px-4 py-3 font-medium">Due Date</th>
                 <th className="px-4 py-3 font-medium">Time</th>
+                {onItemUpdate && <th className="px-4 py-3 font-medium w-[100px]">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -521,6 +609,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                 const TypeIcon = typeIcons[item.type];
                 const statusInfo = statusConfig[item.status];
                 const StatusIcon = statusInfo.icon;
+                const isEditingRow = editingId === item.id;
 
                 return (
                   <tr
@@ -531,26 +620,38 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                     )}
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            "w-1 h-8 rounded-full",
-                            getClassColor(item.classCode, classList)
-                          )}
-                        />
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={cn(
+                                        "w-1 h-8 rounded-full",
+                                        getClassColor(item.classCode, classList)
+                                      )}
+                                    />
                         <div>
-                          <p
-                            className={cn(
-                              "font-medium",
-                              item.status === "completed" && "line-through"
-                            )}
-                          >
-                            {item.title}
-                          </p>
-                          {item.description && (
-                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                              {item.description}
-                            </p>
+                          {isEditingRow ? (
+                            <Input
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              placeholder="Task name"
+                              className="font-medium h-9 max-w-[200px]"
+                              autoFocus
+                            />
+                          ) : (
+                            <>
+                              <p
+                                className={cn(
+                                  "font-medium",
+                                  item.status === "completed" && "line-through"
+                                )}
+                              >
+                                {item.title}
+                              </p>
+                              {item.description && (
+                                <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                                  {item.description}
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -612,38 +713,84 @@ export function ItemTable({ items, onStatusChange, onGradeChange, classes: class
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{formatDate(item.dueDate)}</span>
-                        {item.status !== "completed" && (
-                          <Badge
-                            variant={
-                              daysUntil < 0
-                                ? "destructive"
-                                : daysUntil <= 3
-                                  ? "default"
-                                  : "secondary"
-                            }
-                            className={cn(
-                              "text-xs",
-                              daysUntil <= 3 &&
-                                daysUntil >= 0 &&
-                                "bg-warning text-warning-foreground"
-                            )}
-                          >
-                            {daysUntil < 0
-                              ? "Overdue"
-                              : daysUntil === 0
-                                ? "Today"
-                                : daysUntil === 1
-                                  ? "Tomorrow"
-                                  : `${daysUntil}d`}
-                          </Badge>
-                        )}
-                      </div>
+                      {isEditingRow ? (
+                        <Input
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                          className="h-9 w-[140px]"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{formatDate(item.dueDate)}</span>
+                          {item.status !== "completed" && (
+                            <Badge
+                              variant={
+                                daysUntil < 0
+                                  ? "destructive"
+                                  : daysUntil <= 3
+                                    ? "default"
+                                    : "secondary"
+                              }
+                              className={cn(
+                                "text-xs",
+                                daysUntil <= 3 &&
+                                  daysUntil >= 0 &&
+                                  "bg-warning text-warning-foreground"
+                              )}
+                            >
+                              {daysUntil < 0
+                                ? "Overdue"
+                                : daysUntil === 0
+                                  ? "Today"
+                                  : daysUntil === 1
+                                    ? "Tomorrow"
+                                    : `${daysUntil}d`}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {item.time || "-"}
                     </td>
+                    {onItemUpdate && (
+                      <td className="px-4 py-3">
+                        {isEditingRow ? (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              className="h-8 gap-1"
+                              onClick={saveEditing}
+                              disabled={!editTitle.trim() || !editDueDate}
+                            >
+                              <Check className="h-4 w-4" />
+                              Save
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1"
+                              onClick={cancelEditing}
+                            >
+                              <X className="h-4 w-4" />
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => startEditing(item)}
+                            aria-label="Edit assignment"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Edit
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

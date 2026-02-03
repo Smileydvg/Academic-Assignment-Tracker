@@ -11,11 +11,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Circle, CheckCircle2, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Circle, CheckCircle2, Clock, GripVertical } from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
 
 interface CalendarViewProps {
   items: AcademicItem[];
   onStatusChange: (id: string, status: ItemStatus) => void;
+  onItemUpdate?: (id: string, updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>) => void;
   classes?: ClassInfo[];
 }
 
@@ -43,7 +50,11 @@ function getClassTextColor(classCode: string, classList: ClassInfo[]): string {
   return colorMap[classInfo?.color || ""] || "text-muted-foreground";
 }
 
-export function CalendarView({ items, onStatusChange, classes: classesProp }: CalendarViewProps) {
+function formatDateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function CalendarView({ items, onStatusChange, onItemUpdate, classes: classesProp }: CalendarViewProps) {
   const classList = classesProp || defaultClasses;
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
@@ -98,6 +109,18 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
     );
   };
 
+  const handleDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination || !onItemUpdate || source.droppableId === destination.droppableId) return;
+    const newDueDate = destination.droppableId;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDueDate)) return;
+    onItemUpdate(result.draggableId, { dueDate: newDueDate });
+  };
+
+  const isDragEnabled = !!onItemUpdate;
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
   const calendarDays = [];
   
   // Empty cells for days before the first of the month
@@ -111,16 +134,10 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
   for (let day = 1; day <= daysInMonth; day++) {
     const dayItems = monthItems.get(day) || [];
     const hasItems = dayItems.length > 0;
-    
-    calendarDays.push(
-      <div
-        key={day}
-        className={cn(
-          "h-24 md:h-32 border-r border-b border-border p-1 md:p-2 transition-colors",
-          hasItems ? "bg-card" : "bg-secondary/10",
-          isToday(day) && "ring-2 ring-primary ring-inset"
-        )}
-      >
+    const droppableId = formatDateKey(year, month, day);
+
+    const dayCellContent = (
+      <>
         <div className="flex items-center justify-between mb-1">
           <span
             className={cn(
@@ -136,21 +153,39 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
             </Badge>
           )}
         </div>
-        <div className="space-y-1 overflow-hidden">
-          {dayItems.slice(0, 2).map((item) => (
-            <Popover key={item.id}>
-              <PopoverTrigger asChild>
-                <button
-                  className={cn(
-                    "w-full text-left text-xs px-1.5 py-0.5 rounded truncate transition-opacity",
-                    item.status === "completed" ? "opacity-50 line-through" : "",
-                    getClassColor(item.classCode, classList),
-                    "text-background font-medium"
-                  )}
-                >
-                  {item.title}
-                </button>
-              </PopoverTrigger>
+        <div className="space-y-1 overflow-hidden min-h-[20px]">
+          {dayItems.slice(0, 2).map((item, index) =>
+            isDragEnabled ? (
+              <Draggable key={item.id} draggableId={item.id} index={index} disableInteractiveElementBlocking>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={cn(
+                      "flex items-center gap-0.5 touch-manipulation group",
+                      snapshot.isDragging && "opacity-90 shadow-lg z-50"
+                    )}
+                  >
+                    <div
+                      {...provided.dragHandleProps}
+                      className="shrink-0 cursor-grab active:cursor-grabbing p-1 -ml-0.5 rounded bg-black/25 hover:bg-black/40 min-w-[24px] min-h-[24px] flex items-center justify-center touch-manipulation"
+                      aria-label="Drag to change date"
+                    >
+                      <GripVertical className="h-4 w-4 text-white" />
+                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          className={cn(
+                            "flex-1 min-w-0 text-left text-xs px-1 py-0.5 rounded truncate transition-opacity",
+                            item.status === "completed" ? "opacity-50 line-through" : "",
+                            getClassColor(item.classCode, classList),
+                            "text-background font-medium"
+                          )}
+                        >
+                          {item.title}
+                        </button>
+                      </PopoverTrigger>
               <PopoverContent className="w-72" align="start">
                 <div className="space-y-3">
                   <div>
@@ -210,7 +245,84 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
                 </div>
               </PopoverContent>
             </Popover>
-          ))}
+                  </div>
+                )}
+              </Draggable>
+            ) : (
+              <Popover key={item.id}>
+                <PopoverTrigger asChild>
+                  <button
+                    className={cn(
+                      "w-full text-left text-xs px-1.5 py-0.5 rounded truncate transition-opacity",
+                      item.status === "completed" ? "opacity-50 line-through" : "",
+                      getClassColor(item.classCode, classList),
+                      "text-background font-medium"
+                    )}
+                  >
+                    {item.title}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72" align="start">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={cn("w-2 h-2 rounded-full", getClassColor(item.classCode, classList))} />
+                        <span className={cn("text-xs font-mono", getClassTextColor(item.classCode, classList))}>
+                          {item.classCode}
+                        </span>
+                      </div>
+                      <h4 className="font-semibold">{item.title}</h4>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {item.time ? `Due at ${item.time}` : "No time set"}
+                      </span>
+                      <Badge variant="secondary" className="capitalize">
+                        {item.type}
+                      </Badge>
+                    </div>
+                    {item.location && (
+                      <p className="text-sm text-muted-foreground">
+                        Location: {item.location}
+                      </p>
+                    )}
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <Button
+                        size="sm"
+                        variant={item.status === "not-started" ? "default" : "outline"}
+                        className="flex-1 gap-1"
+                        onClick={() => onStatusChange(item.id, "not-started")}
+                      >
+                        <Circle className="h-3 w-3" />
+                        Not Started
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={item.status === "in-progress" ? "default" : "outline"}
+                        className="flex-1 gap-1"
+                        onClick={() => onStatusChange(item.id, "in-progress")}
+                      >
+                        <Clock className="h-3 w-3" />
+                        In Progress
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={item.status === "completed" ? "default" : "outline"}
+                        className="flex-1 gap-1"
+                        onClick={() => onStatusChange(item.id, "completed")}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )
+          )}
           {dayItems.length > 2 && (
             <Popover>
               <PopoverTrigger asChild>
@@ -251,8 +363,41 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
             </Popover>
           )}
         </div>
+      </>
+    );
+
+    const dayCell = isDragEnabled ? (
+      <Droppable key={day} droppableId={droppableId} direction="vertical">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={cn(
+              "h-24 md:h-32 border-r border-b border-border p-1 md:p-2 transition-colors",
+              hasItems ? "bg-card" : "bg-secondary/10",
+              isToday(day) && "ring-2 ring-primary ring-inset",
+              snapshot.isDraggingOver && "bg-primary/10 ring-2 ring-primary/50 ring-inset"
+            )}
+          >
+            {dayCellContent}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    ) : (
+      <div
+        key={day}
+        className={cn(
+          "h-24 md:h-32 border-r border-b border-border p-1 md:p-2 transition-colors",
+          hasItems ? "bg-card" : "bg-secondary/10",
+          isToday(day) && "ring-2 ring-primary ring-inset"
+        )}
+      >
+        {dayCellContent}
       </div>
     );
+
+    calendarDays.push(dayCell);
   }
 
   // Empty cells to complete the grid
@@ -290,6 +435,9 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
       </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
+        {isDragEnabled && (
+          <p className="text-sm text-muted-foreground mb-2">Drag assignments by the ⋮⋮ grip to move them between days</p>
+        )}
         <div className="grid grid-cols-7 bg-secondary/50">
           {DAYS.map((day) => (
             <div
@@ -300,9 +448,17 @@ export function CalendarView({ items, onStatusChange, classes: classesProp }: Ca
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {calendarDays}
-        </div>
+        {isDragEnabled ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-7">
+              {calendarDays}
+            </div>
+          </DragDropContext>
+        ) : (
+          <div className="grid grid-cols-7">
+            {calendarDays}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4 text-sm">
