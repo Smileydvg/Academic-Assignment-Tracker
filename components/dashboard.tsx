@@ -202,6 +202,10 @@ export function Dashboard() {
     setItems((prev) => [...prev, { ...item, semesterId: currentSemesterId }]);
   };
 
+  const handleDeleteItem = useCallback((id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
   const handleUpdateItem = useCallback(
     (
       id: string,
@@ -228,6 +232,15 @@ export function Dashboard() {
 
   const handleAddSemester = (semester: Semester) => {
     setSemesters((prev) => [...prev, semester]);
+  };
+
+  const handleUpdateSemester = (
+    semesterId: string,
+    updates: Partial<Pick<Semester, "name" | "startDate" | "endDate">>
+  ) => {
+    setSemesters((prev) =>
+      prev.map((s) => (s.id === semesterId ? { ...s, ...updates } : s))
+    );
   };
 
   const handleDeleteSemester = (semesterId: string) => {
@@ -358,6 +371,7 @@ export function Dashboard() {
                     currentSemesterId={currentSemesterId}
                     onSemesterChange={handleSemesterChange}
                     onAddSemester={handleAddSemester}
+                    onUpdateSemester={handleUpdateSemester}
                     onDeleteSemester={handleDeleteSemester}
                     onAddClass={handleAddClass}
                     onDeleteClass={handleDeleteClass}
@@ -459,6 +473,7 @@ export function Dashboard() {
               onStatusChange={handleStatusChange}
               onGradeChange={handleGradeChange}
               onItemUpdate={handleUpdateItem}
+              onDeleteItem={handleDeleteItem}
               classes={currentClasses}
             />
           ) : view === "calendar" ? (
@@ -466,6 +481,7 @@ export function Dashboard() {
               items={currentItems}
               onStatusChange={handleStatusChange}
               onItemUpdate={handleUpdateItem}
+              onDeleteItem={handleDeleteItem}
               classes={currentClasses}
             />
           ) : (

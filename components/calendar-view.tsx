@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Circle, CheckCircle2, Clock, GripVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Circle, CheckCircle2, Clock, GripVertical, Trash2 } from "lucide-react";
 import {
   DragDropContext,
   Droppable,
@@ -23,6 +23,7 @@ interface CalendarViewProps {
   items: AcademicItem[];
   onStatusChange: (id: string, status: ItemStatus) => void;
   onItemUpdate?: (id: string, updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>) => void;
+  onDeleteItem?: (id: string) => void;
   classes?: ClassInfo[];
 }
 
@@ -54,7 +55,7 @@ function formatDateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export function CalendarView({ items, onStatusChange, onItemUpdate, classes: classesProp }: CalendarViewProps) {
+export function CalendarView({ items, onStatusChange, onItemUpdate, onDeleteItem, classes: classesProp }: CalendarViewProps) {
   const classList = classesProp || defaultClasses;
   const onItemUpdateRef = useRef(onItemUpdate);
   onItemUpdateRef.current = onItemUpdate;
@@ -220,7 +221,7 @@ export function CalendarView({ items, onStatusChange, onItemUpdate, classes: cla
                       Location: {item.location}
                     </p>
                   )}
-                  <div className="flex gap-2 pt-2 border-t border-border">
+                  <div className="flex gap-2 pt-2 border-t border-border flex-wrap">
                     <Button
                       size="sm"
                       variant={item.status === "not-started" ? "default" : "outline"}
@@ -248,6 +249,19 @@ export function CalendarView({ items, onStatusChange, onItemUpdate, classes: cla
                       <CheckCircle2 className="h-3 w-3" />
                       Done
                     </Button>
+                    {onDeleteItem && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </div>
               </PopoverContent>
@@ -296,7 +310,7 @@ export function CalendarView({ items, onStatusChange, onItemUpdate, classes: cla
                         Location: {item.location}
                       </p>
                     )}
-                    <div className="flex gap-2 pt-2 border-t border-border">
+                    <div className="flex gap-2 pt-2 border-t border-border flex-wrap">
                       <Button
                         size="sm"
                         variant={item.status === "not-started" ? "default" : "outline"}
@@ -324,6 +338,19 @@ export function CalendarView({ items, onStatusChange, onItemUpdate, classes: cla
                         <CheckCircle2 className="h-3 w-3" />
                         Done
                       </Button>
+                      {onDeleteItem && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </PopoverContent>

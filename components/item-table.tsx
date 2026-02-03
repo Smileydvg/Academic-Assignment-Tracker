@@ -48,6 +48,7 @@ import {
   Pencil,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 
 interface ItemTableProps {
@@ -55,6 +56,7 @@ interface ItemTableProps {
   onStatusChange: (id: string, status: ItemStatus) => void;
   onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number) => void;
   onItemUpdate?: (id: string, updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>) => void;
+  onDeleteItem?: (id: string) => void;
   classes?: ClassInfo[];
 }
 
@@ -247,7 +249,7 @@ function GradeDialog({
   );
 }
 
-export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, classes: classesProp }: ItemTableProps) {
+export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, onDeleteItem, classes: classesProp }: ItemTableProps) {
   const classList = classesProp || defaultClasses;
   const [filterClass, setFilterClass] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -433,11 +435,12 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                                           {item.description}
                                         </p>
                                       )}
+                                      <div className="flex items-center gap-1 mt-2 -ml-2">
                                       {onItemUpdate && (
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-8 mt-2 -ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+                                          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
                                           onClick={() => startEditing(item)}
                                           aria-label="Edit assignment"
                                         >
@@ -445,6 +448,21 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                                           Edit
                                         </Button>
                                       )}
+                                      {onDeleteItem && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 gap-1.5 text-muted-foreground hover:text-destructive"
+                                          onClick={() => {
+                                            if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
+                                          }}
+                                          aria-label="Delete assignment"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          Delete
+                                        </Button>
+                                      )}
+                                    </div>
                                     </>
                                   )}
                                 </div>
@@ -600,7 +618,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                 <th className="px-4 py-3 font-medium">Grade</th>
                 <th className="px-4 py-3 font-medium">Due Date</th>
                 <th className="px-4 py-3 font-medium">Time</th>
-                {onItemUpdate && <th className="px-4 py-3 font-medium w-[100px]">Actions</th>}
+                {(onItemUpdate || onDeleteItem) && <th className="px-4 py-3 font-medium w-[120px]">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -754,7 +772,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {item.time || "-"}
                     </td>
-                    {onItemUpdate && (
+                    {(onItemUpdate || onDeleteItem) && (
                       <td className="px-4 py-3">
                         {isEditingRow ? (
                           <div className="flex gap-1">
@@ -778,16 +796,34 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                             </Button>
                           </div>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => startEditing(item)}
-                            aria-label="Edit assignment"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Edit
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {onItemUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => startEditing(item)}
+                                aria-label="Edit assignment"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </Button>
+                            )}
+                            {onDeleteItem && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-muted-foreground hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
+                                }}
+                                aria-label="Delete assignment"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </td>
                     )}

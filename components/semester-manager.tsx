@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Palette,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import type { Semester, ClassInfo } from "@/lib/data";
 
@@ -44,6 +45,7 @@ interface SemesterManagerProps {
   currentSemesterId: string;
   onSemesterChange: (semesterId: string) => void;
   onAddSemester: (semester: Semester) => void;
+  onUpdateSemester: (semesterId: string, updates: Partial<Pick<Semester, "name" | "startDate" | "endDate">>) => void;
   onDeleteSemester: (semesterId: string) => void;
   onAddClass: (semesterId: string, classInfo: ClassInfo) => void;
   onDeleteClass: (semesterId: string, classCode: string) => void;
@@ -67,6 +69,7 @@ export function SemesterManager({
   currentSemesterId,
   onSemesterChange,
   onAddSemester,
+  onUpdateSemester,
   onDeleteSemester,
   onAddClass,
   onDeleteClass,
@@ -75,10 +78,13 @@ export function SemesterManager({
   const [addSemesterOpen, setAddSemesterOpen] = useState(false);
   const [addClassOpen, setAddClassOpen] = useState(false);
   const [manageClassesOpen, setManageClassesOpen] = useState(false);
+  const [editingSemesterName, setEditingSemesterName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState("");
   
   // New semester form
   const [newSeason, setNewSeason] = useState("Fall");
   const [newYear, setNewYear] = useState(currentYear.toString());
+  const [newSemesterName, setNewSemesterName] = useState("");
   
   // New class form
   const [newClassCode, setNewClassCode] = useState("");
@@ -99,14 +105,9 @@ export function SemesterManager({
   const currentSemester = semesters.find((s) => s.id === currentSemesterId);
 
   const handleAddSemester = () => {
-    const id = `${newSeason.toLowerCase()}-${newYear}`;
-    const name = `${newSeason} ${newYear}`;
+    const id = `semester-${Date.now()}`;
+    const name = newSemesterName.trim() || `${newSeason} ${newYear}`;
     
-    // Check if semester already exists
-    if (semesters.some((s) => s.id === id)) {
-      return;
-    }
-
     onAddSemester({
       id,
       name,
@@ -117,7 +118,21 @@ export function SemesterManager({
     });
     
     setAddSemesterOpen(false);
+    setNewSemesterName("");
     onSemesterChange(id);
+  };
+
+  const startEditingName = () => {
+    setEditNameValue(currentSemester?.name ?? "");
+    setEditingSemesterName(true);
+  };
+
+  const saveSemesterName = () => {
+    const trimmed = editNameValue.trim();
+    if (trimmed && trimmed !== currentSemester?.name) {
+      onUpdateSemester(currentSemesterId, { name: trimmed });
+    }
+    setEditingSemesterName(false);
   };
 
   const handleAddClass = () => {
@@ -197,6 +212,14 @@ export function SemesterManager({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Semester Name</Label>
+              <Input
+                placeholder={`${newSeason} ${newYear}`}
+                value={newSemesterName}
+                onChange={(e) => setNewSemesterName(e.target.value)}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Season</Label>
@@ -238,12 +261,47 @@ export function SemesterManager({
       </Dialog>
 
       {/* Manage Classes Dialog */}
-      <Dialog open={manageClassesOpen} onOpenChange={setManageClassesOpen}>
+      <Dialog
+        open={manageClassesOpen}
+        onOpenChange={(open) => {
+          setManageClassesOpen(open);
+          if (!open) setEditingSemesterName(false);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              Manage Classes - {currentSemester?.name}
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <BookOpen className="h-5 w-5 text-primary shrink-0" />
+              {editingSemesterName ? (
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Input
+                    value={editNameValue}
+                    onChange={(e) => setEditNameValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveSemesterName()}
+                    className="max-w-xs"
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={saveSemesterName}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingSemesterName(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Manage Classes – {currentSemester?.name}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={startEditingName}
+                    title="Rename semester"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
