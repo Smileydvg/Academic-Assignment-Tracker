@@ -17,9 +17,10 @@ import { GradeTracker } from "@/components/grade-tracker";
 import { StatsCards } from "@/components/stats-cards";
 import { AddAssignment } from "@/components/add-assignment";
 import { SemesterManager } from "@/components/semester-manager";
-import { ImportData } from "@/components/import-data";
+import { ImportData, type ImportMode } from "@/components/import-data";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +106,7 @@ export function Dashboard() {
   const [currentSemesterId, setCurrentSemesterId] = useState("my-semester");
   const [view, setView] = useState<"list" | "calendar" | "grades">("list");
   const [isLoaded, setIsLoaded] = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -303,11 +305,17 @@ export function Dashboard() {
   const handleImportData = (
     newItems: AcademicItem[],
     newClasses: ClassInfo[],
-    newSemester: Semester
+    newSemester: Semester,
+    mode: ImportMode = "replace",
+    updatedSemesters?: Semester[]
   ) => {
     setItems(newItems);
-    setSemesters([newSemester]);
-    setCurrentSemesterId(newSemester.id);
+    if (mode === "add" && updatedSemesters) {
+      setSemesters(updatedSemesters);
+    } else {
+      setSemesters([newSemester]);
+      setCurrentSemesterId(newSemester.id);
+    }
   };
 
   const showImport = items.length === 0 && isLoaded;
@@ -358,7 +366,33 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Sheet open={addSheetOpen} onOpenChange={setAddSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Add from spreadsheet
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Add from spreadsheet</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    <ImportData
+                      mode="add"
+                      existingItems={items}
+                      existingClasses={currentClasses}
+                      existingSemesters={semesters}
+                      currentSemesterId={currentSemesterId}
+                      onImport={(mergedItems, _classes, _sem, mode, updatedSems) => {
+                        handleImportData(mergedItems, _classes, _sem, mode, updatedSems);
+                        setAddSheetOpen(false);
+                      }}
+                    />
+                  </div>
+                </SheetContent>
+              </Sheet>
               <Button
                 variant="outline"
                 size="sm"
@@ -372,7 +406,7 @@ export function Dashboard() {
                 }}
               >
                 <Upload className="h-4 w-4" />
-                Import new
+                Replace all
               </Button>
               <div className="hidden md:inline-flex">
                 <AddAssignment

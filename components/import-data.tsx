@@ -8,8 +8,21 @@ import { parseSpreadsheet } from "@/lib/spreadsheet-parser";
 import type { AcademicItem, ClassInfo, Semester } from "@/lib/data";
 import { Upload, FileSpreadsheet, ChevronRight, AlertCircle } from "lucide-react";
 
+export type ImportMode = "replace" | "add";
+
 interface ImportDataProps {
-  onImport: (items: AcademicItem[], classes: ClassInfo[], semester: Semester) => void;
+  onImport: (
+    items: AcademicItem[],
+    classes: ClassInfo[],
+    semester: Semester,
+    mode: ImportMode,
+    updatedSemesters?: Semester[]
+  ) => void;
+  mode?: ImportMode;
+  existingItems?: AcademicItem[];
+  existingClasses?: ClassInfo[];
+  existingSemesters?: Semester[];
+  currentSemesterId?: string;
 }
 
 const EXAMPLE = `Class	Title	Type	Due Date	Time
@@ -18,10 +31,18 @@ MATH101	Quiz 1	quiz	2/20/2026	In Class
 CS200	Project Proposal	project	3/1/2026
 ENG101	Essay Draft	assignment	2/25/2026	11:59 PM`;
 
-export function ImportData({ onImport }: ImportDataProps) {
+export function ImportData({
+  onImport,
+  mode = "replace",
+  existingItems = [],
+  existingClasses = [],
+  existingSemesters = [],
+  currentSemesterId = "my-semester",
+}: ImportDataProps) {
   const [pasteText, setPasteText] = useState("");
   const [error, setError] = useState("");
   const [isParsing, setIsParsing] = useState(false);
+  const isAddMode = mode === "add";
 
   const handleImport = () => {
     setError("");
@@ -64,7 +85,29 @@ export function ImportData({ onImport }: ImportDataProps) {
         semesterId: semester.id,
       }));
 
-      onImport(itemsWithSemester, classes, semester);
+      if (isAddMode && existingSemesters.length > 0 && currentSemesterId) {
+        const targetSemesterId = currentSemesterId;
+        const currentSem = existingSemesters.find((s) => s.id === targetSemesterId) ?? existingSemesters[0];
+        const mergedClassCodes = new Set(currentSem.classes.map((c) => c.code));
+        const mergedClasses = [...currentSem.classes];
+        for (const cls of classes) {
+          if (!mergedClassCodes.has(cls.code)) {
+            mergedClasses.push(cls);
+            mergedClassCodes.add(cls.code);
+          }
+        }
+        const mergedItems = [
+          ...existingItems,
+          ...itemsWithSemester.map((i) => ({ ...i, semesterId: targetSemesterId })),
+        ];
+        const updatedSemester = { ...currentSem, classes: mergedClasses };
+        const updatedSemesters = existingSemesters.map((s) =>
+          s.id === targetSemesterId ? updatedSemester : s
+        );
+        onImport(mergedItems, mergedClasses, updatedSemester, "add", updatedSemesters);
+      } else {
+        onImport(itemsWithSemester, classes, semester, "replace", undefined);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse data.");
     } finally {
@@ -98,6 +141,9 @@ export function ImportData({ onImport }: ImportDataProps) {
             <label className="text-sm font-medium">
               Paste your data (Tab or comma separated)
             </label>
+            <p className="text-xs text-muted-foreground">
+              Paste multiple sheets at once — separate with blank lines or repeated header rows.
+            </p>
             <Textarea
               placeholder="Class	Title	Type	Due Date	Time&#10;MATH101	Homework 1	homework	2/15/2026	11:59 PM&#10;..."
               value={pasteText}
@@ -147,7 +193,7 @@ export function ImportData({ onImport }: ImportDataProps) {
                 </>
               ) : (
                 <>
-                  Import & view dashboard
+                  {isAddMode ? "Add to dashboard" : "Import & view dashboard"}
                   <ChevronRight className="h-4 w-4" />
                 </>
               )}

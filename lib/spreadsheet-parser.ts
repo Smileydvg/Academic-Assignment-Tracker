@@ -75,8 +75,15 @@ export interface ParseResult {
   classes: ClassInfo[];
 }
 
-export function parseSpreadsheet(text: string): ParseResult {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+function looksLikeHeader(line: string): boolean {
+  const lower = line.toLowerCase();
+  return (
+    (lower.includes("class") || lower.includes("course")) &&
+    (lower.includes("title") || lower.includes("name") || lower.includes("assignment") || lower.includes("due") || lower.includes("date"))
+  );
+}
+
+function parseSingleBlock(lines: string[], baseId: string): ParseResult {
   if (lines.length < 2) return { items: [], classes: [] };
 
   const delimiter = detectDelimiter(lines[0]);
@@ -101,6 +108,8 @@ export function parseSpreadsheet(text: string): ParseResult {
   let colorIndex = 0;
 
   for (let i = 1; i < lines.length; i++) {
+    if (looksLikeHeader(lines[i])) continue;
+
     const cells = lines[i].split(delimiter).map((c) => c.trim());
     const classRaw = cells[classCol] ?? "";
     const titleRaw = cells[titleCol] ?? "";
@@ -108,7 +117,6 @@ export function parseSpreadsheet(text: string): ParseResult {
 
     if (!titleRaw && !classRaw) continue;
 
-    // Parse class: "MATH101" or "MATH101 - Calculus"
     let classCode = classRaw;
     let className = classRaw;
     const dash = classRaw.indexOf(" - ");
@@ -135,7 +143,7 @@ export function parseSpreadsheet(text: string): ParseResult {
     const time = timeCol >= 0 && cells[timeCol] ? cells[timeCol] : undefined;
 
     items.push({
-      id: `imported-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 9)}`,
+      id: `${baseId}-${i}-${Math.random().toString(36).slice(2, 9)}`,
       title: titleRaw || `${type} ${i}`,
       class: className,
       classCode,
@@ -146,6 +154,59 @@ export function parseSpreadsheet(text: string): ParseResult {
     });
   }
 
-  const classes = Array.from(classMap.values());
-  return { items, classes };
+  return { items, classes: Array.from(classMap.values()) };
+}
+
+export function parseSpreadsheet(text: string): ParseResult {
+  const trimmed = text.trim();
+  if (!trimmed) return { items: [], classes: [] };
+
+  const baseId = `imported-${Date.now()}`;
+  const allItems: AcademicItem[] = [];
+  const allClassesMap = new Map<string, ClassInfo>();
+  let globalColorIndex = 0;
+
+  // Split by blank lines (double newline = new sheet)
+  const blocks = trimmed.split(/\n\s*\n/);
+
+  for (let b = 0; b < blocks.length; b++) {
+    const block = blocks[b].trim();
+    if (!block) continue;
+
+    const rawLines = block.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (rawLines.length < 2) continue;
+
+    // Detect multiple header blocks within same text (repeated header = new sheet)
+    const chunkStarts: number[] = [0];
+    for (let i = 1; i < rawLines.length; i++) {
+      if (looksLikeHeader(rawLines[i]) && !looksLikeHeader(rawLines[i - 1])) {
+        chunkStarts.push(i);
+      }
+    }
+
+    for (let c = 0; c < chunkStarts.length; c++) {
+      const start = chunkStarts[c];
+      const end = c + 1 < chunkStarts.length ? chunkStarts[c + 1] : rawLines.length;
+      const chunk = rawLines.slice(start, end);
+      if (chunk.length < 2) continue;
+
+      const { items, classes } = parseSingleBlock(chunk, `${baseId}-${b}-${c}`);
+
+      for (const cls of classes) {
+        if (!allClassesMap.has(cls.code)) {
+          allClassesMap.set(cls.code, {
+            ...cls,
+            color: COLORS[globalColorIndex % COLORS.length],
+          });
+          globalColorIndex++;
+        }
+      }
+      allItems.push(...items);
+    }
+  }
+
+  return {
+    items: allItems,
+    classes: Array.from(allClassesMap.values()),
+  };
 }
