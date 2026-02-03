@@ -31,6 +31,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -51,13 +52,25 @@ import {
   Trash2,
 } from "lucide-react";
 
+const GRADE_CATEGORIES: { value: AcademicItem["gradeCategory"]; label: string }[] = [
+  { value: "exam", label: "Exam" },
+  { value: "final", label: "Final Exam" },
+  { value: "hw", label: "Homework" },
+  { value: "quiz", label: "Quiz" },
+  { value: "project", label: "Project" },
+  { value: "lab", label: "Lab" },
+  { value: "participation", label: "Participation" },
+];
+
 interface ItemTableProps {
   items: AcademicItem[];
   onStatusChange: (id: string, status: ItemStatus) => void;
-  onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number) => void;
+  onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number, gradeCategory?: AcademicItem["gradeCategory"]) => void;
   onItemUpdate?: (id: string, updates: Partial<Pick<AcademicItem, "title" | "dueDate" | "time" | "description">>) => void;
+  onBulkUpdate?: (ids: string[], updates: Partial<Pick<AcademicItem, "type" | "classCode" | "class">>) => void;
   onDeleteItem?: (id: string) => void;
   classes?: ClassInfo[];
+  gradeWeights?: Record<string, Record<string, { weight: number; label: string }>>;
 }
 
 const typeIcons: Record<ItemType, React.ElementType> = {
@@ -119,23 +132,30 @@ function GradeDialog({
   item,
   onGradeChange,
   classList,
+  gradeWeightsMap,
 }: {
   item: AcademicItem;
-  onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number) => void;
+  onGradeChange: (id: string, grade: number | undefined, isLate?: boolean, daysLate?: number, gradeCategory?: AcademicItem["gradeCategory"]) => void;
   classList: ClassInfo[];
+  gradeWeightsMap?: Record<string, Record<string, { weight: number; label: string }>>;
 }) {
-  const [grade, setGrade] = useState<string>(item.grade?.toString() || "");
+  const [grade, setGrade] = useState<string>(item.grade?.toString() ?? "");
+  const [gradeCategory, setGradeCategory] = useState<AcademicItem["gradeCategory"]>(item.gradeCategory ?? "hw");
   const [isLate, setIsLate] = useState(item.isLate || false);
   const [daysLate, setDaysLate] = useState<string>(item.daysLate?.toString() || "1");
   const [open, setOpen] = useState(false);
 
   const classInfo = classList.find((c) => c.code === item.classCode);
   const hasLatePenalty = classInfo?.hasLatePenalty || false;
+  const classWeights = gradeWeightsMap?.[item.classCode];
+  const categories = classWeights
+    ? Object.entries(classWeights).map(([key, v]) => ({ value: key as AcademicItem["gradeCategory"], label: v.label }))
+    : GRADE_CATEGORIES;
 
   const handleSave = () => {
     const gradeNum = grade ? Number.parseFloat(grade) : undefined;
     const daysLateNum = isLate ? Number.parseInt(daysLate) || 1 : 0;
-    onGradeChange(item.id, gradeNum, isLate, daysLateNum);
+    onGradeChange(item.id, gradeNum, isLate, daysLateNum, gradeCategory);
     setOpen(false);
   };
 
@@ -175,7 +195,7 @@ function GradeDialog({
         <DialogHeader>
           <DialogTitle>Edit Grade - {item.title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="grade">Grade (%)</Label>
             <Input
@@ -183,10 +203,30 @@ function GradeDialog({
               type="number"
               min="0"
               max="100"
+              step="0.1"
               placeholder="Enter grade (0-100)"
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Category (for grade average)</Label>
+            <Select
+              value={gradeCategory ?? "hw"}
+              onValueChange={(v) => setGradeCategory(v as AcademicItem["gradeCategory"])}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {hasLatePenalty && (
@@ -249,7 +289,7 @@ function GradeDialog({
   );
 }
 
-export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, onDeleteItem, classes: classesProp }: ItemTableProps) {
+export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, onBulkUpdate, onDeleteItem, classes: classesProp, gradeWeights: gradeWeightsMap }: ItemTableProps) {
   const classList = classesProp || defaultClasses;
   const [filterClass, setFilterClass] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -259,6 +299,9 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTypeValue, setBulkTypeValue] = useState<string>("");
+  const [bulkClassValue, setBulkClassValue] = useState<string>("");
 
   const startEditing = (item: AcademicItem) => {
     setEditingId(item.id);
@@ -280,6 +323,15 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
       });
     }
     cancelEditing();
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const filteredItems = items
@@ -309,6 +361,34 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
       }
       return a.type.localeCompare(b.type);
     });
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredItems.map((i) => i.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkTypeChange = (type: ItemType) => {
+    if (onBulkUpdate && selectedIds.size > 0) {
+      onBulkUpdate(Array.from(selectedIds), { type });
+      setBulkTypeValue("");
+    }
+  };
+
+  const handleBulkClassChange = (classCode: string) => {
+    if (onBulkUpdate && selectedIds.size > 0 && classCode) {
+      const cls = classList.find((c) => c.code === classCode);
+      onBulkUpdate(Array.from(selectedIds), {
+        classCode,
+        class: cls?.name ?? classCode,
+      });
+      setBulkClassValue("");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -381,6 +461,43 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
         </Select>
       </div>
 
+      {/* Bulk actions bar */}
+      {onBulkUpdate && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-border bg-primary/5">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <Select value={bulkTypeValue} onValueChange={(v) => { setBulkTypeValue(v); handleBulkTypeChange(v as ItemType); }}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Change type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="assignment">Assignment</SelectItem>
+              <SelectItem value="homework">Homework</SelectItem>
+              <SelectItem value="quiz">Quiz</SelectItem>
+              <SelectItem value="exam">Exam</SelectItem>
+              <SelectItem value="project">Project</SelectItem>
+              <SelectItem value="lecture">Lecture</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={bulkClassValue} onValueChange={(v) => { setBulkClassValue(v); handleBulkClassChange(v); }}>
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue placeholder="Change class" />
+            </SelectTrigger>
+            <SelectContent>
+              {classList.map((c) => (
+                <SelectItem key={c.code} value={c.code}>
+                  {c.code} – {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border overflow-hidden">
         {/* Mobile: Card layout */}
         <div className="block md:hidden space-y-3 p-3">
@@ -396,11 +513,20 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                 key={item.id}
                 className={cn(
                   "overflow-hidden transition-colors hover:bg-secondary/30",
-                  item.status === "completed" && "opacity-60"
+                  item.status === "completed" && "opacity-60",
+                  onBulkUpdate && selectedIds.has(item.id) && "ring-2 ring-primary"
                 )}
               >
                 <CardContent className="p-4 gap-3 flex flex-col">
                   <div className="flex items-start gap-3">
+                    {onBulkUpdate && (
+                      <Checkbox
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                        className="mt-1 shrink-0"
+                        aria-label={`Select ${item.title}`}
+                      />
+                    )}
                     <div
                       className={cn(
                         "w-1 min-h-10 rounded-full shrink-0",
@@ -585,18 +711,17 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                                         </DropdownMenu>
                                       </div>
                                     </div>
-                                    {item.gradeCategory && (
-                                      <div>
-                                        <span className="text-xs text-muted-foreground">Grade</span>
-                                        <div className="mt-0.5">
-                                          <GradeDialog
-                                            item={item}
-                                            onGradeChange={onGradeChange}
-                                            classList={classList}
-                                          />
-                                        </div>
+                                    <div>
+                                      <span className="text-xs text-muted-foreground">Grade</span>
+                                      <div className="mt-0.5">
+                                        <GradeDialog
+                                          item={item}
+                                          onGradeChange={onGradeChange}
+                                          classList={classList}
+                                          gradeWeightsMap={gradeWeightsMap}
+                                        />
                                       </div>
-                                    )}
+                                    </div>
                                   </>
                                 )}
                               </div>
@@ -611,6 +736,15 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
           <table className="w-full">
             <thead>
               <tr className="bg-secondary/50 text-left text-sm text-muted-foreground">
+                {onBulkUpdate && (
+                  <th className="px-4 py-3 w-12">
+                    <Checkbox
+                      checked={selectedIds.size > 0 && selectedIds.size === filteredItems.length}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Class</th>
                 <th className="px-4 py-3 font-medium">Type</th>
@@ -634,9 +768,19 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                     key={item.id}
                     className={cn(
                       "transition-colors hover:bg-secondary/30",
-                      item.status === "completed" && "opacity-60"
+                      item.status === "completed" && "opacity-60",
+                      selectedIds.has(item.id) && "bg-primary/10"
                     )}
                   >
+                    {onBulkUpdate && (
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedIds.has(item.id)}
+                          onCheckedChange={() => toggleSelect(item.id)}
+                          aria-label={`Select ${item.title}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                                   <div className="flex items-center gap-3">
                                     <div
@@ -724,11 +868,12 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                       </DropdownMenu>
                     </td>
                     <td className="px-4 py-3">
-                      {item.gradeCategory ? (
-                        <GradeDialog item={item} onGradeChange={onGradeChange} classList={classList} />
-                      ) : (
-                        <span className="text-muted-foreground text-sm">--</span>
-                      )}
+                      <GradeDialog
+                        item={item}
+                        onGradeChange={onGradeChange}
+                        classList={classList}
+                        gradeWeightsMap={gradeWeightsMap}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       {isEditingRow ? (

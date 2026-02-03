@@ -1,18 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import type { AcademicItem, ClassInfo } from "@/lib/data";
 import { defaultClasses, defaultGradeWeights, calculateLatePenalty } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { AlertTriangle, Pencil, Check, X, Plus, Trash2 } from "lucide-react";
+
+const CATEGORY_OPTIONS = [
+  { key: "exam", label: "Exams" },
+  { key: "final", label: "Final Exam" },
+  { key: "hw", label: "Homework" },
+  { key: "quiz", label: "Quizzes" },
+  { key: "project", label: "Projects" },
+  { key: "lab", label: "Lab" },
+  { key: "participation", label: "Participation" },
+];
 
 interface GradeTrackerProps {
   items: AcademicItem[];
   classes?: ClassInfo[];
   gradeWeights?: Record<string, Record<string, { weight: number; label: string }>>;
+  onUpdateGradeWeights?: (classCode: string, weights: Record<string, { weight: number; label: string }>) => void;
 }
 
 const classes = defaultClasses;
@@ -133,10 +154,82 @@ function calculateClassGrade(
   };
 }
 
-export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeWeightsProp }: GradeTrackerProps) {
+export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeWeightsProp, onUpdateGradeWeights }: GradeTrackerProps) {
   const classList = classesProp || defaultClasses;
   const gradeWeightsMap = gradeWeightsProp || defaultGradeWeights;
+  const [editingClass, setEditingClass] = useState<string | null>(null);
+  const [editWeights, setEditWeights] = useState<Record<string, Record<string, { weight: number; label: string }>>>({});
   const classesWithWarnings = classList.filter((c) => c.killSwitch);
+
+  const startEditing = (classCode: string) => {
+    setEditingClass(classCode);
+    const current = gradeWeightsMap[classCode] || {};
+    setEditWeights((prev) => ({
+      ...prev,
+      [classCode]: Object.fromEntries(
+        Object.entries(current).map(([k, v]) => [k, { ...v }])
+      ),
+    }));
+  };
+
+  const cancelEditing = (classCode: string) => {
+    setEditingClass(null);
+    setEditWeights((prev) => {
+      const next = { ...prev };
+      delete next[classCode];
+      return next;
+    });
+  };
+
+  const saveEditing = (classCode: string) => {
+    const weights = editWeights[classCode];
+    if (weights && onUpdateGradeWeights) {
+      const total = Object.values(weights).reduce((s, w) => s + w.weight, 0);
+      if (Math.abs(total - 1) > 0.01) return;
+      onUpdateGradeWeights(classCode, weights);
+    }
+    setEditingClass(null);
+    setEditWeights((prev) => {
+      const next = { ...prev };
+      delete next[classCode];
+      return next;
+    });
+  };
+
+  const updateEditWeight = (classCode: string, catKey: string, weight: number, label?: string) => {
+    setEditWeights((prev) => {
+      const classWeights = { ...(prev[classCode] || {}) };
+      const existing = classWeights[catKey];
+      classWeights[catKey] = {
+        weight: Math.max(0, Math.min(1, weight)),
+        label: label ?? existing?.label ?? catKey,
+      };
+      return { ...prev, [classCode]: classWeights };
+    });
+  };
+
+  const addCategory = (classCode: string) => {
+    const existing = editWeights[classCode] || {};
+    const used = new Set(Object.keys(existing));
+    const available = CATEGORY_OPTIONS.find((c) => !used.has(c.key));
+    if (available) {
+      setEditWeights((prev) => ({
+        ...prev,
+        [classCode]: {
+          ...(prev[classCode] || {}),
+          [available.key]: { weight: 0.1, label: available.label },
+        },
+      }));
+    }
+  };
+
+  const removeCategory = (classCode: string, catKey: string) => {
+    setEditWeights((prev) => {
+      const classWeights = { ...(prev[classCode] || {}) };
+      delete classWeights[catKey];
+      return { ...prev, [classCode]: classWeights };
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -173,6 +266,12 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
             ? getLetterGrade(currentGrade)
             : null;
           const weights = gradeWeightsMap[classInfo.code];
+          const isEditing = editingClass === classInfo.code;
+          const displayWeights = isEditing ? (editWeights[classInfo.code] || weights || {}) : (weights || {});
+          const editTotal = isEditing
+            ? Object.values(editWeights[classInfo.code] || {}).reduce((s, w) => s + w.weight, 0)
+            : 1;
+          const totalValid = Math.abs(editTotal - 1) < 0.01;
 
           return (
             <Card key={classInfo.code} className="bg-card border-border">
@@ -189,8 +288,8 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    {currentGrade !== null ? (
+                  <div className="flex items-center gap-2">
+                    {currentGrade !== null && !isEditing && (
                       <>
                         <p
                           className={cn(
@@ -204,40 +303,109 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                           {currentGrade.toFixed(1)}%
                         </p>
                       </>
-                    ) : (
+                    )}
+                    {currentGrade === null && !isEditing && (
                       <p className="text-sm text-muted-foreground">
                         No grades yet
                       </p>
+                    )}
+                    {onUpdateGradeWeights && (
+                      isEditing ? (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => saveEditing(classInfo.code)}
+                            disabled={!totalValid}
+                            title="Save"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => cancelEditing(classInfo.code)}
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => startEditing(classInfo.code)}
+                          title="Edit weights"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {currentGrade !== null && (
+                {currentGrade !== null && !isEditing && (
                   <Progress value={currentGrade} className="h-2" />
                 )}
 
                 {/* Category Breakdown */}
                 <div className="space-y-3">
-                  {weights &&
-                    Object.entries(weights).map(([cat, info]) => {
-                      const catData = categoryBreakdown[cat];
-                      const catPercent =
-                        catData && catData.possible > 0
-                          ? (catData.earned / catData.possible) * 100
-                          : null;
+                  {Object.keys(displayWeights).length === 0 && !isEditing && (
+                    <p className="text-sm text-muted-foreground">
+                      No categories set. Click the pencil to add.
+                    </p>
+                  )}
+                  {Object.entries(displayWeights).map(([cat, info]) => {
+                    const catData = categoryBreakdown[cat];
+                    const catPercent =
+                      catData && catData.possible > 0
+                        ? (catData.earned / catData.possible) * 100
+                        : null;
 
-                      return (
-                        <div key={cat} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">
-                              {info.label}
-                            </span>
+                    return (
+                      <div key={cat} className="flex items-center justify-between text-sm gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-muted-foreground truncate">
+                            {info.label}
+                          </span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={5}
+                                className="w-16 h-7 text-xs"
+                                value={Math.round(info.weight * 100)}
+                                onChange={(e) => {
+                                  const v = Number.parseInt(e.target.value, 10);
+                                  if (!Number.isNaN(v)) {
+                                    updateEditWeight(classInfo.code, cat, v / 100, info.label);
+                                  }
+                                }}
+                              />
+                              <span className="text-xs">%</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                onClick={() => removeCategory(classInfo.code, cat)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
                             <Badge variant="secondary" className="text-xs">
                               {(info.weight * 100).toFixed(0)}%
                             </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
+                          )}
+                        </div>
+                        {!isEditing && (
+                          <div className="flex items-center gap-2 shrink-0">
                             {catData && catData.items > 0 ? (
                               <>
                                 <span className="font-medium">
@@ -251,13 +419,33 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                               <span className="text-muted-foreground">--</span>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        )}
+                      </div>
+                    );
+                  })}
+                  {isEditing && (
+                    <div className="pt-2 border-t border-border">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 w-full"
+                        onClick={() => addCategory(classInfo.code)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add category
+                      </Button>
+                      <p className={cn(
+                        "text-xs mt-2",
+                        totalValid ? "text-muted-foreground" : "text-destructive"
+                      )}>
+                        Total: {(editTotal * 100).toFixed(0)}% {totalValid ? "(must equal 100%)" : "— Must equal 100%"}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Late Penalty Notice */}
-                {classInfo.hasLatePenalty && (
+                {classInfo.hasLatePenalty && !isEditing && (
                   <p className="text-xs text-muted-foreground border-t border-border pt-3">
                     Late penalty: -10% per day late
                   </p>

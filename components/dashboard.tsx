@@ -181,7 +181,8 @@ export function Dashboard() {
     id: string,
     grade: number | undefined,
     isLate?: boolean,
-    daysLate?: number
+    daysLate?: number,
+    gradeCategory?: AcademicItem["gradeCategory"]
   ) => {
     setItems((prev) =>
       prev.map((item) =>
@@ -191,9 +192,29 @@ export function Dashboard() {
               grade,
               isLate: isLate || false,
               daysLate: daysLate || 0,
+              gradeCategory: gradeCategory !== undefined ? gradeCategory : item.gradeCategory,
               status: grade !== undefined ? "completed" : item.status,
             }
           : item
+      )
+    );
+  };
+
+  const handleUpdateGradeWeights = (
+    classCode: string,
+    weights: Record<string, { weight: number; label: string }>
+  ) => {
+    setSemesters((prev) =>
+      prev.map((s) =>
+        s.id === currentSemesterId
+          ? {
+              ...s,
+              gradeWeights: {
+                ...s.gradeWeights,
+                [classCode]: weights,
+              },
+            }
+          : s
       )
     );
   };
@@ -213,6 +234,21 @@ export function Dashboard() {
     ) => {
       setItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      );
+    },
+    []
+  );
+
+  const handleBulkUpdate = useCallback(
+    (
+      ids: string[],
+      updates: Partial<Pick<AcademicItem, "type" | "classCode" | "class">>
+    ) => {
+      const idSet = new Set(ids);
+      setItems((prev) =>
+        prev.map((item) =>
+          idSet.has(item.id) ? { ...item, ...updates } : item
+        )
       );
     },
     []
@@ -473,8 +509,10 @@ export function Dashboard() {
               onStatusChange={handleStatusChange}
               onGradeChange={handleGradeChange}
               onItemUpdate={handleUpdateItem}
+              onBulkUpdate={handleBulkUpdate}
               onDeleteItem={handleDeleteItem}
               classes={currentClasses}
+              gradeWeights={currentGradeWeights}
             />
           ) : view === "calendar" ? (
             <CalendarView
@@ -489,6 +527,7 @@ export function Dashboard() {
               items={currentItems}
               classes={currentClasses}
               gradeWeights={currentGradeWeights}
+              onUpdateGradeWeights={handleUpdateGradeWeights}
             />
           )}
         </div>
