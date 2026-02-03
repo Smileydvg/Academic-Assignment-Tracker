@@ -311,34 +311,34 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                     )}
                     {onUpdateGradeWeights && (
                       isEditing ? (
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="h-8 w-8 p-0"
                             onClick={() => saveEditing(classInfo.code)}
                             disabled={!totalValid}
                             title="Save"
+                            aria-label="Save weights"
                           >
                             <Check className="h-4 w-4" />
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="h-8 w-8 p-0"
                             onClick={() => cancelEditing(classInfo.code)}
                             title="Cancel"
+                            aria-label="Cancel editing"
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ) : (
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          className="h-8 w-8 p-0"
                           onClick={() => startEditing(classInfo.code)}
                           title="Edit weights"
+                          aria-label="Edit grade weights"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -373,13 +373,13 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                             {info.label}
                           </span>
                           {isEditing ? (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2">
                               <Input
                                 type="number"
                                 min={0}
                                 max={100}
                                 step={5}
-                                className="w-16 h-7 text-xs"
+                                className="w-16 min-h-[44px] text-xs"
                                 value={Math.round(info.weight * 100)}
                                 onChange={(e) => {
                                   const v = Number.parseInt(e.target.value, 10);
@@ -390,12 +390,13 @@ export function GradeTracker({ items, classes: classesProp, gradeWeights: gradeW
                               />
                               <span className="text-xs">%</span>
                               <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive"
                                 onClick={() => removeCategory(classInfo.code, cat)}
+                                aria-label={`Remove ${info.label} category`}
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           ) : (

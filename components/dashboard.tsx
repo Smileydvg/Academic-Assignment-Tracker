@@ -21,7 +21,13 @@ import { ImportData, type ImportMode } from "@/components/import-data";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList, Upload } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { GraduationCap, CalendarDays, List, BarChart3, ClipboardList, Upload, Plus, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "academic-dashboard-items";
@@ -107,6 +113,7 @@ export function Dashboard() {
   const [view, setView] = useState<"list" | "calendar" | "grades">("list");
   const [isLoaded, setIsLoaded] = useState(false);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [addAssignmentOpen, setAddAssignmentOpen] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -393,15 +400,15 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-2 md:gap-4 min-w-0">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
               <div className="p-2 rounded-lg bg-primary/10">
                 <GraduationCap className="h-6 w-6 text-primary" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold">Academic Dashboard</h1>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg md:text-xl font-bold truncate">Academic Dashboard</h1>
+                <div className="flex items-center gap-2 mt-0.5">
                   <SemesterManager
                     semesters={semesters}
                     currentSemesterId={currentSemesterId}
@@ -416,10 +423,10 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 md:gap-2 shrink-0">
               <Sheet open={addSheetOpen} onOpenChange={setAddSheetOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-2 hidden md:flex">
                     <Upload className="h-4 w-4" />
                     Add from spreadsheet
                   </Button>
@@ -446,7 +453,7 @@ export function Dashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-2 hidden md:flex"
                 onClick={() => {
                   if (confirm("Replace all data with a new import? Current assignments will be cleared.")) {
                     setItems([]);
@@ -463,6 +470,58 @@ export function Dashboard() {
                   onAddItem={handleAddItem}
                   onAddItems={handleAddItems}
                   classes={currentClasses}
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="md:hidden"
+                    aria-label="Add assignment or import from spreadsheet"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={4}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setAddSheetOpen(true);
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Add from Spreadsheet
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setAddAssignmentOpen(true);
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Manual Entry
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      if (confirm("Replace all data with a new import? Current assignments will be cleared.")) {
+                        setItems([]);
+                        setSemesters(initialSemesters);
+                        setCurrentSemesterId("my-semester");
+                      }
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Replace all
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="md:hidden">
+                <AddAssignment
+                  onAddItem={handleAddItem}
+                  onAddItems={handleAddItems}
+                  classes={currentClasses}
+                  open={addAssignmentOpen}
+                  onOpenChange={setAddAssignmentOpen}
+                  hideTrigger
                 />
               </div>
               <Tabs
@@ -499,10 +558,10 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6">
+      <main className="container mx-auto px-4 py-6 pb-24 md:pb-6 space-y-6 min-h-0 overflow-x-hidden">
         <StatsCards items={currentItems} />
 
-        <div className="rounded-xl border border-border bg-card p-4 md:p-6">
+        <div className="rounded-xl border border-border bg-card p-4 md:p-6 overflow-x-hidden">
           {view === "list" ? (
             <ItemTable
               items={currentItems}
@@ -538,12 +597,12 @@ export function Dashboard() {
         className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-[env(safe-area-inset-bottom)]"
         aria-label="Main navigation"
       >
-        <div className="grid grid-cols-3 min-h-16">
+        <div className="grid grid-cols-3 min-h-[64px]">
           <button
             type="button"
             onClick={() => setView("list")}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors min-h-[44px] min-w-[44px]",
               view === "list"
                 ? "text-primary font-medium"
                 : "text-muted-foreground hover:text-foreground"
@@ -558,7 +617,7 @@ export function Dashboard() {
             type="button"
             onClick={() => setView("grades")}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors min-h-[44px] min-w-[44px]",
               view === "grades"
                 ? "text-primary font-medium"
                 : "text-muted-foreground hover:text-foreground"
@@ -573,7 +632,7 @@ export function Dashboard() {
             type="button"
             onClick={() => setView("calendar")}
             className={cn(
-              "flex flex-col items-center justify-center gap-1 text-sm transition-colors",
+              "flex flex-col items-center justify-center gap-1 text-sm transition-colors min-h-[44px] min-w-[44px]",
               view === "calendar"
                 ? "text-primary font-medium"
                 : "text-muted-foreground hover:text-foreground"

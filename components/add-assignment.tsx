@@ -47,6 +47,12 @@ interface AddAssignmentProps {
   classes?: ClassInfo[];
   /** When true, renders as a compact FAB (icon only) for mobile */
   variant?: "default" | "fab";
+  /** Controlled open state - when provided with onOpenChange, enables controlled mode */
+  open?: boolean;
+  /** Callback when open state changes - use with open for controlled mode */
+  onOpenChange?: (open: boolean) => void;
+  /** When true, hides the trigger (use with controlled open/onOpenChange for custom triggers) */
+  hideTrigger?: boolean;
 }
 
 // Month name mapping for parsing
@@ -262,10 +268,13 @@ function parseTextToAssignments(text: string, classes: ClassInfo[]): ParsedItem[
   return parsed;
 }
 
-export function AddAssignment({ onAddItem, onAddItems, classes: classesProp, variant = "default" }: AddAssignmentProps) {
+export function AddAssignment({ onAddItem, onAddItems, classes: classesProp, variant = "default", open: controlledOpen, onOpenChange: controlledOnOpenChange, hideTrigger = false }: AddAssignmentProps) {
   const classes = classesProp || defaultClasses;
   const classList = classes; // Declare classList variable
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined && controlledOnOpenChange !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange : setInternalOpen;
   const [activeTab, setActiveTab] = useState("manual");
 
   // Manual form state
@@ -385,20 +394,22 @@ export function AddAssignment({ onAddItem, onAddItems, classes: classesProp, var
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          className={
-            variant === "fab"
-              ? "rounded-full w-14 h-14 shadow-lg"
-              : "gap-2"
-          }
-          size={variant === "fab" ? "icon" : "default"}
-          aria-label={variant === "fab" ? "Add assignment" : undefined}
-        >
-          <Plus className={variant === "fab" ? "h-6 w-6" : "h-4 w-4"} />
-          {variant === "default" && "Add Assignment"}
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button
+            className={
+              variant === "fab"
+                ? "rounded-full w-14 h-14 shadow-lg"
+                : "gap-2"
+            }
+            size={variant === "fab" ? "icon" : "default"}
+            aria-label={variant === "fab" ? "Add assignment" : undefined}
+          >
+            <Plus className={variant === "fab" ? "h-6 w-6" : "h-4 w-4"} />
+            {variant === "default" && "Add Assignment"}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

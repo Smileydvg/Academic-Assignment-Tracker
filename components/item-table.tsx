@@ -2,7 +2,7 @@
 
 import React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AcademicItem, ItemStatus, ItemType, ClassInfo } from "@/lib/data";
 import { classes as defaultClasses, calculateLatePenalty } from "@/lib/data";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
+  ChevronRight,
   Circle,
   CheckCircle2,
   Clock,
@@ -169,7 +174,7 @@ function GradeDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-auto py-1 px-2 gap-1.5">
+        <Button variant="ghost" size="sm" className="h-auto min-h-[44px] py-2 px-3 gap-1.5">
           {item.grade !== undefined ? (
             <span
               className={cn(
@@ -302,6 +307,11 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTypeValue, setBulkTypeValue] = useState<string>("");
   const [bulkClassValue, setBulkClassValue] = useState<string>("");
+  const [expandedDetailsId, setExpandedDetailsId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editingId) setExpandedDetailsId(editingId);
+  }, [editingId]);
 
   const startEditing = (item: AcademicItem) => {
     setEditingId(item.id);
@@ -399,14 +409,14 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
           placeholder="Search by class, type, or title..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-secondary"
+          className="pl-10 bg-secondary min-h-[44px]"
         />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3">
         <Select value={filterClass} onValueChange={setFilterClass}>
-          <SelectTrigger className="w-[180px] bg-secondary">
+          <SelectTrigger className="w-full sm:w-[180px] min-h-[44px] bg-secondary">
             <SelectValue placeholder="All Classes" />
           </SelectTrigger>
           <SelectContent>
@@ -420,7 +430,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
         </Select>
 
         <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[150px] bg-secondary">
+          <SelectTrigger className="w-full sm:w-[150px] min-h-[44px] bg-secondary">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
@@ -435,7 +445,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
         </Select>
 
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[150px] bg-secondary">
+          <SelectTrigger className="w-full sm:w-[150px] min-h-[44px] bg-secondary">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -450,7 +460,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
           value={sortBy}
           onValueChange={(v) => setSortBy(v as "dueDate" | "class" | "type")}
         >
-          <SelectTrigger className="w-[150px] bg-secondary">
+          <SelectTrigger className="w-full sm:w-[150px] min-h-[44px] bg-secondary">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -463,12 +473,12 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
 
       {/* Bulk actions bar */}
       {onBulkUpdate && selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-border bg-primary/5">
-          <span className="text-sm font-medium">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 p-3 rounded-lg border border-border bg-primary/5">
+          <span className="text-sm font-medium self-center">
             {selectedIds.size} selected
           </span>
           <Select value={bulkTypeValue} onValueChange={(v) => { setBulkTypeValue(v); handleBulkTypeChange(v as ItemType); }}>
-            <SelectTrigger className="w-[160px] h-9">
+            <SelectTrigger className="w-full sm:w-[160px] min-h-[44px]">
               <SelectValue placeholder="Change type" />
             </SelectTrigger>
             <SelectContent>
@@ -481,7 +491,7 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
             </SelectContent>
           </Select>
           <Select value={bulkClassValue} onValueChange={(v) => { setBulkClassValue(v); handleBulkClassChange(v); }}>
-            <SelectTrigger className="w-[180px] h-9">
+            <SelectTrigger className="w-full sm:w-[180px] min-h-[44px]">
               <SelectValue placeholder="Change class" />
             </SelectTrigger>
             <SelectContent>
@@ -499,250 +509,280 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
       )}
 
       <div className="rounded-lg border border-border overflow-hidden">
-        {/* Mobile: Card layout */}
-        <div className="block md:hidden space-y-3 p-3">
-          {filteredItems.map((item) => {
-            const daysUntil = getDaysUntil(item.dueDate);
-            const TypeIcon = typeIcons[item.type];
-            const statusInfo = statusConfig[item.status];
-            const StatusIcon = statusInfo.icon;
-            const isEditing = editingId === item.id;
+        {/* Mobile: Compact table with Class + Title visible, Details accordion */}
+        <div className="block md:hidden">
+          <div className="border-b border-border bg-secondary/50">
+            <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground">
+              {onBulkUpdate && (
+                <div className="flex items-center justify-center w-10 shrink-0">
+                  <Checkbox
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredItems.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </div>
+              )}
+              <div className="w-16 shrink-0">Class</div>
+              <div className="min-w-0 flex-1">Title</div>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {filteredItems.map((item) => {
+              const daysUntil = getDaysUntil(item.dueDate);
+              const TypeIcon = typeIcons[item.type];
+              const statusInfo = statusConfig[item.status];
+              const StatusIcon = statusInfo.icon;
+              const isEditing = editingId === item.id;
+              const isExpanded = expandedDetailsId === item.id;
 
-            return (
-              <Card
-                key={item.id}
-                className={cn(
-                  "overflow-hidden transition-colors hover:bg-secondary/30",
-                  item.status === "completed" && "opacity-60",
-                  onBulkUpdate && selectedIds.has(item.id) && "ring-2 ring-primary"
-                )}
-              >
-                <CardContent className="p-4 gap-3 flex flex-col">
-                  <div className="flex items-start gap-3">
-                    {onBulkUpdate && (
-                      <Checkbox
-                        checked={selectedIds.has(item.id)}
-                        onCheckedChange={() => toggleSelect(item.id)}
-                        className="mt-1 shrink-0"
-                        aria-label={`Select ${item.title}`}
-                      />
+              return (
+                <Collapsible
+                  key={item.id}
+                  open={isExpanded}
+                  onOpenChange={(open) => setExpandedDetailsId(open ? item.id : null)}
+                >
+                  <div
+                    className={cn(
+                      "transition-colors",
+                      item.status === "completed" && "opacity-60",
+                      selectedIds.has(item.id) && "bg-primary/5"
                     )}
-                    <div
-                      className={cn(
-                        "w-1 min-h-10 rounded-full shrink-0",
-                        getClassColor(item.classCode, classList)
+                  >
+                    <div className="flex items-center gap-2 px-3 py-3 min-h-[44px]">
+                      {onBulkUpdate && (
+                        <div className="flex items-center justify-center w-10 shrink-0">
+                          <Checkbox
+                            checked={selectedIds.has(item.id)}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                            aria-label={`Select ${item.title}`}
+                          />
+                        </div>
                       )}
-                    />
-                                <div className="min-w-0 flex-1">
-                                  {isEditing ? (
-                                    <Input
-                                      value={editTitle}
-                                      onChange={(e) => setEditTitle(e.target.value)}
-                                      placeholder="Task name"
-                                      className="font-medium h-9"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <>
-                                      <p
-                                        className={cn(
-                                          "font-medium",
-                                          item.status === "completed" && "line-through"
-                                        )}
-                                      >
-                                        {item.title}
-                                      </p>
-                                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                                        <TypeIcon className="h-4 w-4 shrink-0" />
-                                        <span className="capitalize">{item.type}</span>
-                                      </div>
-                                      {item.description && (
-                                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                          {item.description}
-                                        </p>
+                      <div className="w-16 shrink-0">
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {item.classCode}
+                        </Badge>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {isEditing ? (
+                          <Input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            placeholder="Task name"
+                            className="font-medium h-9 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <p
+                            className={cn(
+                              "font-medium text-sm truncate",
+                              item.status === "completed" && "line-through"
+                            )}
+                          >
+                            {item.title}
+                          </p>
+                        )}
+                      </div>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          aria-label={isExpanded ? "Hide details" : "Show details"}
+                        >
+                          <ChevronRight
+                            className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")}
+                          />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                      <div className="border-t border-border bg-secondary/20 px-3 py-4 space-y-4">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Due Date</Label>
+                              <Input
+                                type="date"
+                                value={editDueDate}
+                                onChange={(e) => setEditDueDate(e.target.value)}
+                                className="h-9 mt-1"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={saveEditing}
+                                disabled={!editTitle.trim() || !editDueDate}
+                              >
+                                <Check className="h-4 w-4" />
+                                Save
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={cancelEditing}
+                              >
+                                <X className="h-4 w-4" />
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <span className="text-xs text-muted-foreground block mb-0.5">Type</span>
+                                <div className="flex items-center gap-2">
+                                  <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="capitalize">{item.type}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-xs text-muted-foreground block mb-0.5">Status</span>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={cn(
+                                        "h-auto min-h-[44px] py-2 px-3 gap-1.5 -ml-2 justify-start",
+                                        statusInfo.className
                                       )}
-                                      <div className="flex items-center gap-1 mt-2 -ml-2">
-                                      {onItemUpdate && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
-                                          onClick={() => startEditing(item)}
-                                          aria-label="Edit assignment"
+                                    >
+                                      <StatusIcon className="h-4 w-4" />
+                                      <span className="text-sm">{statusInfo.label}</span>
+                                      <ChevronDown className="h-3 w-3 opacity-50 ml-auto" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start">
+                                    {(
+                                      Object.entries(statusConfig) as [
+                                        ItemStatus,
+                                        (typeof statusConfig)[ItemStatus],
+                                      ][]
+                                    ).map(([status, config]) => {
+                                      const Icon = config.icon;
+                                      return (
+                                        <DropdownMenuItem
+                                          key={status}
+                                          onClick={() => onStatusChange(item.id, status)}
+                                          className={cn("gap-2", config.className)}
                                         >
-                                          <Pencil className="h-4 w-4" />
-                                          Edit
-                                        </Button>
+                                          <Icon className="h-4 w-4" />
+                                          {config.label}
+                                        </DropdownMenuItem>
+                                      );
+                                    })}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div>
+                                <span className="text-xs text-muted-foreground block mb-0.5">Due Date</span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span>{formatDate(item.dueDate)}</span>
+                                  {item.time && (
+                                    <span className="text-muted-foreground">{item.time}</span>
+                                  )}
+                                  {item.status !== "completed" && (
+                                    <Badge
+                                      variant={
+                                        daysUntil < 0
+                                          ? "destructive"
+                                          : daysUntil <= 3
+                                            ? "default"
+                                            : "secondary"
+                                      }
+                                      className={cn(
+                                        "text-xs",
+                                        daysUntil <= 3 &&
+                                          daysUntil >= 0 &&
+                                          "bg-warning text-warning-foreground"
                                       )}
-                                      {onDeleteItem && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 gap-1.5 text-muted-foreground hover:text-destructive"
-                                          onClick={() => {
-                                            if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
-                                          }}
-                                          aria-label="Delete assignment"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                          Delete
-                                        </Button>
-                                      )}
-                                    </div>
-                                    </>
+                                    >
+                                      {daysUntil < 0
+                                        ? "Overdue"
+                                        : daysUntil === 0
+                                          ? "Today"
+                                          : daysUntil === 1
+                                            ? "Tomorrow"
+                                            : `${daysUntil}d`}
+                                    </Badge>
                                   )}
                                 </div>
                               </div>
-                  <div className="flex flex-col gap-2 pl-4 border-l-2 border-border/50">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Class</span>
-                                  <div className="mt-0.5">
-                                    <Badge variant="secondary" className="font-mono text-xs">
-                                      {item.classCode}
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Due Date</span>
-                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                    {isEditing ? (
-                                      <Input
-                                        type="date"
-                                        value={editDueDate}
-                                        onChange={(e) => setEditDueDate(e.target.value)}
-                                        className="h-9 max-w-[160px]"
-                                      />
-                                    ) : (
-                                      <>
-                                        <span className="text-sm">{formatDate(item.dueDate)}</span>
-                                        {item.time && (
-                                          <span className="text-sm text-muted-foreground">{item.time}</span>
-                                        )}
-                                        {item.status !== "completed" && (
-                                          <Badge
-                                            variant={
-                                              daysUntil < 0
-                                                ? "destructive"
-                                                : daysUntil <= 3
-                                                  ? "default"
-                                                  : "secondary"
-                                            }
-                                            className={cn(
-                                              "text-xs",
-                                              daysUntil <= 3 &&
-                                                daysUntil >= 0 &&
-                                                "bg-warning text-warning-foreground"
-                                            )}
-                                          >
-                                            {daysUntil < 0
-                                              ? "Overdue"
-                                              : daysUntil === 0
-                                                ? "Today"
-                                                : daysUntil === 1
-                                                  ? "Tomorrow"
-                                                  : `${daysUntil}d`}
-                                          </Badge>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                {isEditing ? (
-                                  <div className="flex gap-2 pt-1">
-                                    <Button
-                                      size="sm"
-                                      className="gap-1.5"
-                                      onClick={saveEditing}
-                                      disabled={!editTitle.trim() || !editDueDate}
-                                    >
-                                      <Check className="h-4 w-4" />
-                                      Save
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="gap-1.5"
-                                      onClick={cancelEditing}
-                                    >
-                                      <X className="h-4 w-4" />
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <span className="text-xs text-muted-foreground">Status</span>
-                                      <div className="mt-0.5">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className={cn(
-                                                "h-auto py-1 px-2 gap-1.5 -ml-2",
-                                                statusInfo.className
-                                              )}
-                                            >
-                                              <StatusIcon className="h-4 w-4" />
-                                              <span className="text-sm">{statusInfo.label}</span>
-                                              <ChevronDown className="h-3 w-3 opacity-50" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="start">
-                                            {(
-                                              Object.entries(statusConfig) as [
-                                                ItemStatus,
-                                                (typeof statusConfig)[ItemStatus],
-                                              ][]
-                                            ).map(([status, config]) => {
-                                              const Icon = config.icon;
-                                              return (
-                                                <DropdownMenuItem
-                                                  key={status}
-                                                  onClick={() => onStatusChange(item.id, status)}
-                                                  className={cn("gap-2", config.className)}
-                                                >
-                                                  <Icon className="h-4 w-4" />
-                                                  {config.label}
-                                                </DropdownMenuItem>
-                                              );
-                                            })}
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-xs text-muted-foreground">Grade</span>
-                                      <div className="mt-0.5">
-                                        <GradeDialog
-                                          item={item}
-                                          onGradeChange={onGradeChange}
-                                          classList={classList}
-                                          gradeWeightsMap={gradeWeightsMap}
-                                        />
-                                      </div>
-                                    </div>
-                                  </>
-                                )}
+                              <div>
+                                <span className="text-xs text-muted-foreground block mb-0.5">Grade</span>
+                                <GradeDialog
+                                  item={item}
+                                  onGradeChange={onGradeChange}
+                                  classList={classList}
+                                  gradeWeightsMap={gradeWeightsMap}
+                                />
                               </div>
-                            </CardContent>
-                          </Card>
-            );
-          })}
+                            </div>
+                            {item.description && (
+                              <div>
+                                <span className="text-xs text-muted-foreground block mb-0.5">Description</span>
+                                <p className="text-sm text-muted-foreground line-clamp-3">{item.description}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-2 border-t border-border">
+                              {onItemUpdate && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="min-h-[44px] gap-1.5 text-muted-foreground hover:text-foreground"
+                                  onClick={() => startEditing(item)}
+                                  aria-label="Edit assignment"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                  Edit
+                                </Button>
+                              )}
+                              {onDeleteItem && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="min-h-[44px] gap-1.5 text-muted-foreground hover:text-destructive"
+                                  onClick={() => {
+                                    if (confirm(`Delete "${item.title}"?`)) onDeleteItem(item.id);
+                                  }}
+                                  aria-label="Delete assignment"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Desktop: Table layout */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
+        {/* Desktop: Table layout - scrollable on smaller viewports */}
+        <div className="hidden md:block overflow-x-auto -mx-1 px-1">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="bg-secondary/50 text-left text-sm text-muted-foreground">
                 {onBulkUpdate && (
-                  <th className="px-4 py-3 w-12">
-                    <Checkbox
-                      checked={selectedIds.size > 0 && selectedIds.size === filteredItems.length}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
+                  <th className="px-4 py-3 w-14">
+                    <div className="flex items-center justify-center min-h-[44px] min-w-[44px] -m-2 p-2">
+                      <Checkbox
+                        checked={selectedIds.size > 0 && selectedIds.size === filteredItems.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </div>
                   </th>
                 )}
                 <th className="px-4 py-3 font-medium">Title</th>
@@ -774,11 +814,13 @@ export function ItemTable({ items, onStatusChange, onGradeChange, onItemUpdate, 
                   >
                     {onBulkUpdate && (
                       <td className="px-4 py-3">
-                        <Checkbox
-                          checked={selectedIds.has(item.id)}
-                          onCheckedChange={() => toggleSelect(item.id)}
-                          aria-label={`Select ${item.title}`}
-                        />
+                        <div className="flex items-center justify-center min-h-[44px] min-w-[44px] -m-2 p-2">
+                          <Checkbox
+                            checked={selectedIds.has(item.id)}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                            aria-label={`Select ${item.title}`}
+                          />
+                        </div>
                       </td>
                     )}
                     <td className="px-4 py-3">
